@@ -14,6 +14,7 @@ This repository contains code and documentation for our team's solution to the [
 - **Communication:** [Slack Channel](https://data-science-hubgroup.slack.com/archives/C09EUS28ZEJ)
 
 ## Repository Structure
+```
 brain-to-text-25/
 ├── data/                # Local datasets (do not commit due to large file sizes)
 ├── notebooks/           # Exploration and modeling notebooks
@@ -21,13 +22,13 @@ brain-to-text-25/
 ├── docs/                # Project docs and notes
 ├── requirements.txt     # Python dependencies
 └── README.md            # Project overview
-
+```
 ## Getting Started
 
 1. **Join the competition** on Kaggle and download the dataset.
 2. **Clone this repository** and set up the environment:
     ```
-    git clone [repo-url]
+    git clone https://github.com/yjoechuen/brain-to-text.git
     cd brain-to-text-25
     pip install -r requirements.txt
     ```
