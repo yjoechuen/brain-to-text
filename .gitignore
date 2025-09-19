@@ -83,3 +83,7 @@ data/
 
 # Ignore credentials and config files
 .env
+# Ignore local data
+/data/
+**/ipynb_checkpoints/
+
