@@ -36,8 +36,8 @@ brain-to-text-25/
 ### Tasks and Progress
 
 - [x] Competition registration & GitHub setup
-- [ ] Read through [dataset paper](https://www.nejm.org/doi/full/10.1056/NEJMoa2314132)
-- [ ] Initial exploratory data analysis (EDA)
+- [x] Read through [dataset paper](https://www.nejm.org/doi/full/10.1056/NEJMoa2314132)
+- [~] Initial exploratory data analysis (EDA)
 - [ ] Baseline model/notebook implementation
 - [ ] Data pipeline and environment reproducibility
 
@@ -56,37 +56,99 @@ brain-to-text-25/
 
 ---
 
-## Exploratory Data Analysis (EDA)
+## 🔍 Exploratory Data Analysis (EDA)
 
 This section summarizes key findings from an initial exploration of the **Brain-to-Text ’25** dataset.
 
-### Folder Structure
+### 📂 Folder Structure
 ```
 t15_copyTask_neuralData/
 └── hdf5_data_final/
     ├── t15.2023.08.11      # Exception: only contains train
-        └── data_train.hdf5         
+    │   └── data_train.hdf5         
     ├── t15.2023.08.13      # Contains test, train, and val
-        ├── data_test.hdf5
-        ├── data_train.hdf5
-        └── data_val.hdf5
+    │   ├── data_test.hdf5
+    │   ├── data_train.hdf5
+    │   └── data_val.hdf5
     ├── t15.2023.08.18
     ...
     └── t15.2025.04.13
 ```
 The top-level folder directory is `t15_copyTask_neuralData`, which is around 11GB and takes about 4-6 hours to download. Inside this directory is a single folder, `hdf5_data_final`, which consists of 45 sessions spanning 20 months. Each session is labeled in the form `t15.YYYY.MM.DD` (e.g., `t15.2023.08.13`). All sessions contain 3 `.hdf5` files (`data_train.hdf5, data_test.hdf5, data_val.hdf5`), with the exception of `t15.2023.08.13`, which only contains a single `data_train.hdf5`.
 
-### File Structure
+### 📄 File Structure
+```
+data_train.hdf5
+├── trial_0001/
+│   ├── input_features      (Dataset, shape [T, 512])
+│   ├── seq_class_ids       (Dataset, shape [seq_len])
+│   ├── transcription       (Dataset, string/bytes)
+│   └── (attrs)
+│       ├── n_time_steps    (int)
+│       ├── seq_len         (int)
+│       ├── sentence_label  (int)
+│       ├── session         (string)
+│       ├── block_num       (int)
+│       └── trial_num       (int)
+│
+├── trial_0002/
+│   └── ...
+└── ...
+```
+Let's take a look at a single `data_train.hdf5` file. The `data_train.hdf5` file contains a list of trials, where each trial corresponds to a single sentence attempt (one recording). Each trial contains "Datasets" (stored as arrays) and "Attributes" `attrs` which contain small metadata key-value pairs attached to the trial.
 
-### Dataset Structure
-- **Inputs:** 512 neural features per 20 ms bin  
-  - 256 electrodes × 2 features each:
-    - **Threshold Crossings (TC):** counts of voltage threshold events (proxy for spikes).
-    - **Spike-Band Power (SBP):** continuous signal energy in the high-frequency “spike band.”
-- **Outputs (training/validation only):**
-  - Sentence transcription
-  - Phoneme sequence (aligned to neural features)
-- **Splits:** Separate train, validation, and test files in HDF5 format.
+### 🔑 Explanation of Each Field in a Trial
+
+- **`input_features`** *(Dataset)*  
+  - Shape: `[T, 512]` where `T` = number of 20 ms bins in this trial.  
+  - Columns 0–255 = **Threshold Crossings (TC)** counts per electrode.  
+  - Columns 256–511 = **Spike-Band Power (SBP)** values per electrode.  
+  - Each row = one 20 ms snapshot of neural activity.
+
+- **`seq_class_ids`** *(Dataset, optional)*  
+  - Integer IDs representing the **phoneme sequence** aligned to this trial.  
+  - Present in **train/val** splits, omitted in test splits.
+
+- **`transcription`** *(Dataset, optional)*  
+  - The ground-truth **sentence text** for this trial (bytes; decode to string).  
+  - Present in **train/val** splits, omitted in test splits.
+
+- **`n_time_steps`** *(Attribute)*  
+  - Number of time bins (`T`) for this trial.  
+  - Matches the first dimension of `input_features`.
+
+- **`seq_len`** *(Attribute)*  
+  - Length of the phoneme sequence (`seq_class_ids`).  
+
+- **`sentence_label`** *(Attribute)*  
+  - Stores a numeric or string ID that points to which sentence in the stimulus set this trial came from.
+  - Useful for grouping multiple trials of the same sentence.
+
+- **`session`** *(Attribute)*  
+  - Code for the recording session (e.g., `t15.2021.04.12`).  
+
+- **`block_num`** *(Attribute)*  
+  - Block index within the session (sessions are often broken into multiple blocks).
+  - A continuous chunk of recording with a set of sentences.  
+
+- **`trial_num`** *(Attribute)*  
+  - Trial index within the block.  
+
+### 📄 Dataset Inputs and Outputs
+
+Each `.hdf5` file contains many *trials* (one sentence attempt each).  
+The contents differ slightly between **train/val** and **test** splits:
+
+| Split       | Inputs (given)                                                                 | Outputs (provided)                                                                                           | Metadata (provided)                            |
+|-------------|---------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|-----------------------------------------------|
+| **Train**   | `input_features` `(T, 512)`<br>• 256 electrodes × 2 features (Threshold Crossings + Spike-Band Power)<br>• Each row = 20 ms bin | `seq_class_ids` (phoneme IDs)<br>`seq_len` (length of phoneme sequence)<br>`transcription` (sentence text)<br>`sentence_label` (sentence ID) | `n_time_steps`<br>`session`<br>`block_num`<br>`trial_num` |
+| **Val**     | Same as Train                                                                  | Same as Train                                                                                                | Same as Train                                  |
+| **Test**    | `input_features` `(T, 512)`                                                    | ❌ No phonemes<br>❌ No transcription<br>❌ No sentence_label                                                  | `n_time_steps`<br>`session`<br>`block_num`<br>`trial_num` |
+
+### 🎯 Prediction target
+- For each **test trial**, you are given only the `input_features`.  
+- Your model must predict the **sentence transcription** (text).  
+- Submissions are evaluated using **Character Error Rate (CER)** between your predictions and the hidden ground truth.
 
 ### Trial Statistics
 - **Trial lengths:** Sentences vary in duration, with most trials spanning a few hundred to a few thousand 20 ms bins.
