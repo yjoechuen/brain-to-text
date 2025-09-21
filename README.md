@@ -54,15 +54,69 @@ brain-to-text-25/
 - [An Accurate and Rapidly Calibrating Speech Neuroprosthesis](https://www.nejm.org/doi/full/10.1056/NEJMoa2314132)
 - [Baseline Algorithm from Brain-to-Text '24](https://github.com/Neuroprosthetics-Lab/nejm-brain-to-text)
 
+## 🧠 Neural Features: Threshold Crossings and Spike-Band Power
+
+Each trial’s neural data is represented as a sequence of **512 features** per 20 ms time bin.  
+These features come from **256 microelectrodes** implanted in the speech motor cortex,  
+arranged into four high-density arrays (64 electrodes each).
+
+### ✨ What the features mean
+- **Threshold Crossings (TC)**  
+  - Each electrode records raw voltage signals from nearby neurons.  
+  - A **threshold** is set at *–4.5 × the root mean square (RMS) noise level*.  
+  - Every time the signal dips below that threshold, it is counted as a **spike-like event**.  
+  - The **TC feature** for a bin is simply the **count of events** in that 20 ms window.  
+  - Think of it as “how many strong blips did this electrode detect.”
+
+- **Spike-Band Power (SBP)**  
+  - Neural “spikes” also produce broadband energy in the **high-frequency band** (~250–5000 Hz).  
+  - SBP measures the **energy (RMS power)** of the electrode’s signal in this band.  
+  - Unlike TC (discrete counts), SBP is a **continuous value**, capturing the overall “buzz” of neural activity.  
+  - Think of it as “how strong was the chatter in this frequency band.”
+
+Together, TC and SBP give a fuller picture of neural activity:  
+TC counts sharp, obvious spikes, while SBP measures the more subtle, continuous background activity. 
+
+### 🎯 Why Collect Threshold Crossings (TC) and Spike-Band Power (SBP)?
+- **Threshold Crossings (TC)**  
+  - Capture *precise, discrete firing events* (like click counters).  
+  - Great for detecting sharp transitions in speech movements.  
+  - Especially useful for **consonants** that are short and crisp, like /t/, /p/, /k/.  
+- **Spike-Band Power (SBP)**  
+  - Measures *smooth, continuous population activity*.  
+  - Tracks the ongoing “buzz” of neural engagement over time.  
+  - Especially useful for **vowels**, which require sustained articulator positions (like /a/, /i/, /u/).  
+- **Together** they provide a **richer, more robust signal**:  
+  - TC = **when** neurons fired (timing of discrete events)  
+  - SBP = **how strongly** populations were active (intensity of sustained activity)  
+
+### 🗣️ How this helps phoneme prediction
+Producing speech involves coordinating different articulators:
+- /p/, /b/ → lips  
+- /t/, /d/ → tongue tip  
+- /k/, /g/ → tongue back  
+
+The four cortical areas covered by the arrays (ventral 6v, area 4, 55b, dorsal 6v) capture different aspects of this motor control.  
+By combining both TC and SBP features:
+- The model can **pinpoint consonant onsets/offsets** via TC activity.  
+- The model can **track vowel sustain and transitions** via SBP energy.  
+- This improves the decoder’s ability to align neural activity to **phoneme sequences** and ultimately **sentence predictions**.
+
 ---
 
-## 🔍 Exploratory Data Analysis (EDA)
+📊 **Summary:**  
+- TC = “click counter” → good for **sharp, fast events** like consonants.  
+- SBP = “background buzz” → good for **smooth, sustained activity** like vowels.  
+- Using both ensures the model sees both **timing** and **intensity**, making speech decoding more accurate and robust.
+
+---
+## Exploratory Data Analysis (EDA)
 
 This section summarizes key findings from an initial exploration of the **Brain-to-Text ’25** dataset.
 
 ### 📂 Folder Structure
 ```
-t15_copyTask_neuralData/
+data/
 └── hdf5_data_final/
     ├── t15.2023.08.11      # Exception: only contains train
     │   └── data_train.hdf5         
@@ -74,7 +128,7 @@ t15_copyTask_neuralData/
     ...
     └── t15.2025.04.13
 ```
-The top-level folder directory is `t15_copyTask_neuralData`, which is around 11GB and takes about 4-6 hours to download. Inside this directory is a single folder, `hdf5_data_final`, which consists of 45 sessions spanning 20 months. Each session is labeled in the form `t15.YYYY.MM.DD` (e.g., `t15.2023.08.13`). All sessions contain 3 `.hdf5` files (`data_train.hdf5, data_test.hdf5, data_val.hdf5`), with the exception of `t15.2023.08.13`, which only contains a single `data_train.hdf5`.
+The top-level folder directory is `data`. Inside this directory is a single folder, `hdf5_data_final`, which consists of 45 sessions spanning 20 months. Each session is labeled in the form `t15.YYYY.MM.DD` (e.g., `t15.2023.08.13`). All sessions contain 3 `.hdf5` files (`data_train.hdf5, data_test.hdf5, data_val.hdf5`), with the exception of `t15.2023.08.11`, which only contains a single `data_train.hdf5`.
 
 ### 📄 File Structure
 ```
